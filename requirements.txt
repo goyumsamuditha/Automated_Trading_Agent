@@ -1,3 +1,11 @@
 # Data collection
 yfinance
 requests
+
+
+# Utilities
+python-dotenv
+jupyter
+joblib
+
+
