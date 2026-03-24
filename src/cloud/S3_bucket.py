@@ -42,19 +42,27 @@ def upload_featured_data():
             upload_file_to_s3(f'data/featured(f)',f'featured/{filename}')  # upload each file to S3 under the 'featured/' prefix
 
 def upload_models():
-    for filename in ('decision_engine.pkl', 'scaler.pkl'):
+    """ Upload all model files from the local directory to the S3 bucket"""
+    for filename in ('decision_engine.pkl', 'scaler.pkl'):        
         if os.path.exists(f'models/(f)'):
-            upload_file_to_s3(f'models/(f)',f'models/(f)')         # upload each file to S3 under the 'models/' prefix
+            upload_file_to_s3(f'models/(f)',f'models/(f)')  # upload each file to S3 under the 'models/' prefix
 
 def upload_plots():
+    """ Upload all plot files from the local directory to the S3 bucket"""
     local_dir = 'data/plots'
-     for filename in os.listdir(local_dir):
+    for filename in os.listdir(local_dir):
         if filename.endswith('.png'):
             upload_file_to_s3(f'data/plots(f)',f'plots/{filename}')  # upload each file to S3 under the 'plots/' prefix
 
 
 def download_data_EC2():
     """Download all files from S3 to EC2"""
-    objects = s3.list_v2(Bucket=bucket).get('contents',[])  # 
+    objects = s3.list_v2(Bucket=bucket).get('contents',[])  # list all objects in the S3 bucket
+    for obj in objects:
+        key = obj['Key']  # get the key of each object
+        local = key # set local path same as key
+        download_file_from_s3(key, local)  # download each file from S3 to local path
 
-
+if __name__ == "__main__":
+    upload_raw_data()       # upload raw data files to S3
+    print("Raw data files uploaded to S3 Bucket")
