@@ -12,7 +12,7 @@ s3 = boto3.client(
 
 )
 
-bucket = os.getenv('s3_bucket')  # 
+bucket = os.getenv('s3_bucket')  
 
 def upload_file_to_s3(file_path, s3_key):   
     """upload data files to S3 bucket """
