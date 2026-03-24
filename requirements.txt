@@ -2,6 +2,10 @@
 yfinance
 requests
 
+# Database
+sqlalchemy
+pymysql
+
 
 # Utilities
 python-dotenv
