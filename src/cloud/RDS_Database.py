@@ -78,8 +78,11 @@ def query_trade_log():
     return pd.read_sql('SELECT * FROM trade_log ORDER BY signal_date DESC', engine)
 
 
+
+
+
 if __name__ == '__main__':
-    create_tables()
+    create_table()
 
 
 
