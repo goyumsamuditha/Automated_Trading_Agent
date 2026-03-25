@@ -1,3 +1,4 @@
+# Requires Python 3.13
 # Data collection
 yfinance
 requests
@@ -16,5 +17,3 @@ joblib
 # Cloud — AWS
 boto3
 
-
-pip install -r requirements.txt
