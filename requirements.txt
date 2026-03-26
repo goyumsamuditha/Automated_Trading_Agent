@@ -1,4 +1,3 @@
-# Requires Python 3.13
 # Data collection
 yfinance
 requests
@@ -17,3 +16,10 @@ joblib
 # Cloud — AWS
 boto3
 
+# Data processing & EDA
+pandas
+numpy
+matplotlib
+seaborn
+ta
+scikit-learn
