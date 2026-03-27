@@ -6,7 +6,7 @@ import json
 # load environment variables
 load_dotenv()
 s3 = boto3.client(
-    aws_access_Key_id = os.getenv('AWS_Access_KEY') ,       # access key
+    aws_access_key_id = os.getenv('AWS_Access_KEY') ,       # access key
     aws_secret_access_key = os.getenv('AWS_SECRET_KEY'),    # secret key
     region_name           = os.getenv('AWS_REGION', 'eu-north-1'), # region
 
