@@ -1,5 +1,5 @@
 import os
-import boto3
+import boto3 # AWS SDK for Python  
 from dotenv import load_dotenv
 import json
 
