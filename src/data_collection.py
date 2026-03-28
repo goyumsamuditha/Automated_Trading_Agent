@@ -1,5 +1,5 @@
 # import required libraries
-import yfinance as yf
+import yfinance as yf # Yahoo Finance API for data collection
 import os
 import datetime
 
