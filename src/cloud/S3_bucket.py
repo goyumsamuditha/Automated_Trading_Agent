@@ -6,13 +6,14 @@ import json
 # load environment variables
 load_dotenv()
 s3 = boto3.client(
+    's3',
     aws_access_key_id = os.getenv('AWS_Access_KEY') ,       # access key
     aws_secret_access_key = os.getenv('AWS_SECRET_KEY'),    # secret key
     region_name           = os.getenv('AWS_REGION', 'eu-north-1'), # region
 
 )
 
-bucket = os.getenv('s3_bucket')  
+bucket = os.getenv('S3_BUCKET')  
 
 def upload_file_to_s3(file_path, s3_key):   
     """upload data files to S3 bucket """
@@ -31,7 +32,7 @@ def upload_raw_data():
     local_dir = 'data/raw'
     for filename in os.listdir(local_dir):
         if filename.endswith('.csv'):
-            upload_file_to_s3(f'data/raw(f)',f'raw/{filename}')  # upload each file to S3 under the 'raw/' prefix
+            upload_file_to_s3(f'data/raw/{filename}',f'raw/{filename}')  # upload each file to S3 under the 'raw/' prefix
 
 
 def upload_featured_data():
