@@ -5,12 +5,23 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 load_dotenv()
-DB_URL=(f'mysql+mysqldb://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}'f'@{os.getenv("RDS_HOST")}:3306/{os.getenv("RDS_DB",'database-1')}')  # construct the database URL
+DB_URL=(f'mysql+pymysql://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}'f'@{os.getenv("RDS_HOST")}:3306/{os.getenv("RDS_DB",'database-1')}')  # construct the database URL
 engine = create_engine(DB_URL, echo=False)  # create SQLAlchemy engine
 
 
 def create_table():
     """Create the asset_features and trade_log tables in the database if they do not exist."""
+    ADMIN_DB_URL = f'mysql+pymysql://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}@{os.getenv("RDS_HOST")}:3306/'
+    temp_engine = create_engine(ADMIN_DB_URL)
+    
+    with temp_engine.connect() as conn:
+        db_name = os.getenv("RDS_DB", "database-1")
+        # Use backticks for database names to avoid syntax errors
+        conn.execute(text(f"CREATE DATABASE IF NOT EXISTS `{db_name}`"))
+        conn.commit()
+    temp_engine.dispose()
+    print(f"Database '{db_name}' verified/created.")
+    
     with engine.connect() as conn:
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS asset_features (
@@ -28,15 +39,16 @@ def create_table():
                 inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         '''))                     # execute the SQL command to create the asset_features table if it does not exist
+        conn.execute(text("DROP TABLE IF EXISTS trade_log")) # drop the trade_log table if it already exists to ensure a clean slate for logging trades
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS trade_log (
                 id          INT AUTO_INCREMENT PRIMARY KEY,
                 ticker      VARCHAR(20),
                 signal_date DATE,
-                signal      VARCHAR(10),
+                `signal`      VARCHAR(10),
+                quantity    FLOAT,
                 confidence  FLOAT,
                 price       FLOAT,
-                approved    BOOLEAN,
                 reason      VARCHAR(255),
                 inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -77,15 +89,22 @@ def push_asset_features(ticker):
     print(f'Pushed {len(df)} rows for {ticker} to RDS database.')
 
 
-def log_trade(ticker, signal_date, signal, confidence, price, approved, reason):
+def log_trade(ticker, signal_date, signal, confidence, price, quantity, reason):
     with engine.connect() as conn:                
-        conn.execute(text('''
+        query = text('''
             INSERT INTO trade_log
-              (ticker,signal_date,signal,confidence,price,approved,reason)
-            VALUES (:t,:d,:s,:c,:p,:a,:r)                     
-        '''), dict(t=ticker, d=signal_date, s=signal,
-                  c=round(confidence,4), p=price,
-                  a=approved, r=reason))        
+            (signal_date, `signal`, ticker, quantity, price, confidence, reason)
+            VALUES (:d, :s, :t, :q, :p, :c, :r)                     
+        ''')
+        conn.execute(query,{
+            'd': signal_date,
+            's': signal,
+            't': ticker,
+            'q': quantity,
+            'p': price,
+            'c': round(float(confidence), 4),
+            'r': reason
+        })
         conn.commit()
 
 
@@ -98,6 +117,3 @@ def query_trade_log():
 
 if __name__ == '__main__':
     create_table()
-
-
-
