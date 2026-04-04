@@ -7,9 +7,13 @@ from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
 import joblib,os
+import sys
+import os
+sys.path.append(os.getcwd()) # add the current working directory to the system path to allow imports from src
+
 
 asset = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'IBM', 'BTC-USD', 'ETH-USD'] # list of assets to analyze
-features = ['open', 'high', 'low', 'close', 'volume','RSI_14','SMA_20','SMA_50','EMA_20','EMA_50','MACD','MACD_signal','sentiment_score','RSI_signal','MACD_signal','MA_Crossover_signal'] # list of features to use for the model
+features = ['Open', 'High', 'Low', 'Close', 'Volume','RSI_14','SMA_20','SMA_50','MACD','MACD_Signal','sentiment_score','RSI_Signal','MACD_Crossover'] # list of features to use for the model
 
 
 # load and comined labelled data for all assets
@@ -19,7 +23,7 @@ sentiment_map = dict(zip(sentiment_data['symbol'], sentiment_data['sentiment_sco
 
 for symbol in asset:
     safe = symbol.replace('-','_') # replace '-' with '_' for file naming
-    df = pd.read_csv(f'data/featured/{safe}_labelled.csv',index_col='Date',parse_dates=True) # load the labelled data for the asset
+    df = pd.read_csv(f'data/featured/{safe}_featured.csv',index_col='Date',parse_dates=True) # load the featured data for the asset
     df['sentiment_score'] = sentiment_map.get(symbol, 0.0) # add the sentiment score to the DataFrame
     df['symbol'] = symbol # add the symbol to the DataFrame
     frames.append(df) # append the DataFrame to the list
@@ -29,8 +33,14 @@ print(f"Combined dataset shape: {combined_df.shape}") # print the shape of the c
 print(combined_df['symbol'].value_counts()) # print the count of each symbol in the combined dataset
 
 # featue and labeling
-X = combined_df[features].dropna() # select the features and drop any rows with missing values
-y = combined_df.loc[X.index, 'label'] # select the corresponding labels for the features
+cols_to_keep = features + ['signal'] # specify the columns to keep for modeling
+tempp_df = combined_df[cols_to_keep].dropna() # create a temporary DataFrame with only the specified columns
+
+X = tempp_df[features] # features for modeling
+y = tempp_df['signal'] # target variable for modeling
+
+print(f"Aligned X shape: {X.shape}") # print the shape of the final dataset after dropping NA values
+print(f'Aligned y shape: {y.shape}') # print the shape of the target variable to confirm it matches the features
 
 # split the data into training and testing sets
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42) # split the data into training and testing sets
