@@ -1,0 +1,12 @@
+symbol,keyword,sentiment_score,date
+AAPL,Apple Inc.,0.0,2026-04-03
+MSFT,Microsoft Corporation,0.0,2026-04-03
+GOOGL,Alphabet Inc.,0.0,2026-04-03
+AMZN,"Amazon.com, Inc.",0.0,2026-04-03
+META,"Meta Platforms, Inc.",0.0,2026-04-03
+TSLA,"Tesla, Inc.",0.0,2026-04-03
+NVDA,NVIDIA Corporation,0.0,2026-04-03
+AMD,"Advanced Micro Devices, Inc.",0.0,2026-04-03
+IBM,International Business Machines Corporation,0.0,2026-04-03
+BTC-USD,Bitcoin,0.0,2026-04-03
+ETH-USD,Ethereum,0.0,2026-04-03
