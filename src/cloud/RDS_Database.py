@@ -35,7 +35,7 @@ def create_table():
                 sma_50      FLOAT,
                 bb_width    FLOAT,
                 volatility  FLOAT,
-                label       INT,
+                label       INT, 
                 inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         '''))                     # execute the SQL command to create the asset_features table if it does not exist
