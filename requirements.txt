@@ -29,3 +29,4 @@ textblob
 
 #UI
 streamlit
+plotly
