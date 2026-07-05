@@ -30,3 +30,5 @@ textblob
 #UI
 streamlit
 plotly
+pymysql
+psycopg2-binary
