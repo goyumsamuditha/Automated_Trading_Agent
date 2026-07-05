@@ -1,7 +1,7 @@
 import joblib
 import pandas as pd
 import numpy as np
-from src.cloud.rds_database import log_trade
+from src.cloud.RDS_database import log_trade
 
 
 risk = {
