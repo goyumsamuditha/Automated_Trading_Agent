@@ -3,202 +3,285 @@ import pandas as pd
 import boto3
 import json
 import os
+import yfinance as yf
+import plotly.graph_objects as go
 from sqlalchemy import create_engine
 from dotenv import load_dotenv
 from datetime import datetime
 
+# ==========================================
+# 1. PAGE & CONFIG
+# ==========================================
+st.set_page_config(page_title="Agentic Trading Dashboard", layout="wide", initial_sidebar_state="collapsed")
 load_dotenv()
 
+ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'JPM', 'GS', 'BAC', 'BTC-USD', 'ETH-USD']
 
-# Page configuration
-st.set_page_config(
-    page_title="Trading  Dashboard",
-    layout="wide",
-)
-
-# Global CSS
-st.markdown(
-    """
+st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');
     
-    html, body {
-        font-family: 'IBM Plex Sans', sans-serif;
-        background-color: #0f1117;
-        color: #e0e0e0;
-    }
-    #MainMenu,footer, header { visibility: hidden; }
+    /* Global Resets */
+    html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; color: #c9d1d9; }
+    .stApp { background-color: #0b1015 !important; }
+    header { visibility: hidden; }
     
-    /* Sidebar */
-    [data-testid="stSidebar"]{
-        background-color: #161b22;
-        border-right: 1px solid #30363d;
-    }
-    
-    /* Section headers */
-    h2, h3 {
-        font-family: 'IBM Plex Mono', monospace !important;
-        font-size: 0.9rem !important;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: #8b949e !important;
+    /* Card Styling to match screenshots */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #121820 !important;
+        border: 1px solid #1e293b !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
     }
     
-    /* Metric Cards */
-    [data-testid="stMetricValue"] {
-        background: #ffffff;
-        border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 1rem 1.2rem;
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 1.6rem ;
-    }
+    /* Tab Styling */
+    .stTabs [data-baseweb="tab-list"] { gap: 24px; }
+    .stTabs [data-baseweb="tab"] { height: 50px; white-space: pre-wrap; background-color: transparent; border-radius: 4px 4px 0px 0px; gap: 1px; padding-top: 10px; padding-bottom: 10px; color: #8b949e; font-weight: 600; font-size: 0.9rem; }
+    .stTabs [aria-selected="true"] { color: #e6edf3; border-bottom: 2px solid #58a6ff; }
     
-    [data-testid="stMetricLabel"] {
-        font-family: 'IBM Plex Mono', monospace;
-        font-size: 0.7rem ;
-        letter-spacing: 0.08em;
-        color: #a0aab4;
-    }
- 
-    [data-testid="stDataFrame"] {
-        border: 1px solid #30363d;
-        border-radius: 8px;
-    }
-    [data-testid="stSidebar"] * { 
-    color: #c9d1d9; 
-    }
-    p { color: #c9d1d9 !important; }
-    .block-container { background-color: #0f1117; }
+    /* Table Styling */
+    [data-testid="stDataFrame"] { background-color: #121820; border-radius: 8px; }
     </style>
-    """,
-    unsafe_allow_html=True
-)
-assets = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META','TSLA', 'NVDA','AMD','IBM','BTC-USD','ETH-USD']
+""", unsafe_allow_html=True)
 
+# ==========================================
+# 2. DATA CONNECTIONS (FULLY LIVE)
+# ==========================================
+@st.cache_resource
+def get_aws_client():
+    session = boto3.Session(
+        aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
+        aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
+        region_name=os.getenv('AWS_REGION', 'eu-north-1')
+    )
+    return session.client('s3')
 
-session = boto3.Session(
-    aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-    aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-    region_name=os.getenv('AWS_REGION', 'eu-north-1')
-)
-s3 = session.client('s3')
-bucket = os.getenv('S3_BUCKET', 'goyum-trading-data')
+@st.cache_resource
+def get_db_engine():
+    DB_URL = f'mysql+pymysql://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}@{os.getenv("RDS_HOST")}:3306/{os.getenv("RDS_DB","database-1")}'
+    return create_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600)
 
+@st.cache_data(ttl=900)
+def fetch_kpi_metrics():
+    """Fetches total trades and signal counts from RDS."""
+    try:
+        engine = get_db_engine()
+        total = pd.read_sql("SELECT COUNT(*) AS total FROM trade_log", engine).iloc[0]['total']
+        buys = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='BUY'", engine).iloc[0]['count']
+        sells = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='SELL'", engine).iloc[0]['count']
+        return total, buys, sells
+    except Exception:
+        return 0, 0, 0 
 
-DB_URL = f'mysql+pymysql://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}'f'@{os.getenv("RDS_HOST")}:3306/{os.getenv("RDS_DB","database-1")}'
-engine = create_engine(DB_URL)
+@st.cache_data(ttl=900)
+def fetch_portfolio_performance():
+    """Fetches real-time portfolio metrics from RDS."""
+    try:
+        engine = get_db_engine()
+        query = "SELECT annual_return, sharpe_ratio, max_drawdown, volatility FROM portfolio_metrics ORDER BY date DESC LIMIT 1"
+        metrics = pd.read_sql(query, engine).iloc[0]
+        return metrics['annual_return'], metrics['sharpe_ratio'], metrics['max_drawdown'], metrics['volatility']
+    except Exception:
+        # Fallback to 0 if the table is empty or missing
+        return 0.0, 0.0, 0.0, 0.0
 
+@st.cache_data(ttl=86400) 
+def fetch_chart_data(ticker):
+    """Fetches live pricing data from Yahoo Finance."""
+    return yf.download(ticker, period="6mo", interval="1d", progress=False)
 
+@st.cache_data(ttl=300) 
+def fetch_agent_decisions():
+    """Fetches the latest agent decisions from S3."""
+    try:
+        s3 = get_aws_client()
+        bucket = os.getenv('S3_BUCKET', 'goyum-trading-data')
+        response = s3.list_objects_v2(Bucket=bucket, Prefix='signals/')
+        if 'Contents' not in response: return []
+        latest_file = sorted(response['Contents'], key=lambda x: x['LastModified'])[-1]['Key']
+        obj = s3.get_object(Bucket=bucket, Key=latest_file)
+        return json.loads(obj['Body'].read().decode('utf-8'))
+    except Exception:
+        return [] 
 
-st.sidebar.markdown("### 📡 Live Trading Signals")
-try:
-    response = s3.list_objects_v2(Bucket=bucket, Prefix='signals/')
-    latest_file = sorted(response['Contents'], key=lambda x: x['LastModified'])[-1]['Key']
-    
-    obj = s3.get_object(Bucket=bucket, Key=latest_file)
-    signal_data = json.loads(obj['Body'].read().decode('utf-8'))
-    
-    for item in signal_data:
-        signal = item.get('signal', '-')
-        confidence = item.get('confidence', 0)
-        
-        if signal == "BUY":
-           icon, color = "🟢", "#3fb950"
-        elif signal == "SELL":
-            icon, color = "🔴", "#f85149"
-        else:
-            icon, color = "🟡", "#d29922"
-            
-        col1, col2 = st.sidebar.columns([1, 1])
-        col1.markdown(f"**{icon} {item['ticker']}**")
-        col2.markdown(f"<p style='color:{color}; font-weight:700; margin:0'>{signal}</p>", unsafe_allow_html=True)
-        st.sidebar.caption(f"Confidence: {confidence:.2f}")
-        st.sidebar.divider()
-        
-except Exception as e:
-    st.sidebar.error(f"Could not load latest signals.{e}")
-
-
-# Header
-st.markdown("<h1 style='color:#ffffff; font-size:2rem;'>📈 Automated Trading Agent Dashboard</h1>", unsafe_allow_html=True)
-st.markdown(f"<p style='color:#8b949e'>Last updated: {datetime.now().strftime('%d %b %Y  %H:%M:%S')}</p>", unsafe_allow_html=True)
-st.divider()
-
-# KPI Metrics
-st.markdown("### 📊 Portfolio Overview")
-try:
-    total_trades = pd.read_sql("SELECT COUNT(*) AS total FROM trade_log", engine).iloc[0]['total']
-    top_df = pd.read_sql("SELECT ticker, COUNT(*) AS count FROM trade_log GROUP BY ticker ORDER BY count DESC LIMIT 1", engine)
-    top_ticker = top_df.iloc[0]['ticker'] if not top_df.empty else 'N/A'
-    buying_count = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='BUY'", engine).iloc[0]['count']
-    selling_count = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='SELL'", engine).iloc[0]['count']
-
-except Exception:
-    total_trades = 0
-    top_ticker = 'N/A'
-    buying_count = 0
-    selling_count = 0
-    
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Total Trades", total_trades)
-col2.metric("Top Asset", top_ticker)
-col3.metric("Buy Signals", buying_count)
-col4.metric("Sell Signals", selling_count)
-col5.metric("Live Assets", len(assets))
-
-st.divider()
-
-# Trade Log
-st.markdown("### 📊 Recent Trade Log")
-
-try:
-    df = pd.read_sql("SELECT * FROM trade_log ORDER BY signal_date DESC LIMIT 10", engine)
-    
-    if df.empty:
-        st.markdown("No trade data available yet.")
+# ==========================================
+# 3. DYNAMIC HTML GENERATOR
+# ==========================================
+def render_custom_metric(label, value, subtext, is_percent=False, invert_colors=False):
+    """Dynamically generates HTML colors and arrows based on the value."""
+    if value > 0:
+        color = "#f85149" if invert_colors else "#3fb950" 
+        arrow = "↗"
+        sign = "+"
+    elif value < 0:
+        color = "#3fb950" if invert_colors else "#f85149" 
+        arrow = "↘"
+        sign = "-"
     else:
-        def colour_signal(val):
-            if val == 'BUY':
-                return 'color: #3fb950; font-weight: 600'
-            elif val == 'SELL':
-                return 'color: #f85149; font-weight: 600'
+        color = "#58a6ff" 
+        arrow = "−"
+        sign = ""
+        
+    formatted_num = f"{abs(value):.2f}" if isinstance(value, float) else str(abs(value))
+    if is_percent: formatted_num += "%"
+        
+    st.markdown(f"""
+        <div style="padding: 5px;">
+            <p style='color:#7d8590; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;'>{label}</p>
+            <p style='color:{color}; font-family:"JetBrains Mono", monospace; font-size:1.9rem; font-weight:700; margin-bottom:8px;'>{sign}{formatted_num} <span style='font-size:1.2rem;'>{arrow}</span></p>
+            <p style='color:#7d8590; font-size:0.8rem; margin-bottom:0px;'>{subtext}</p>
+        </div>
+    """, unsafe_allow_html=True)
+
+# ==========================================
+# 4. MAIN DASHBOARD EXECUTION
+# ==========================================
+def main():
+    # --- HEADER ---
+    colA, colB = st.columns([3, 1])
+    with colA:
+        st.markdown("<h2 style='color:#e6edf3; margin-bottom:0px;'>📈 Agentic Trading <span style='font-size:1rem; color:#7d8590; font-weight:400;'>AI-Powered Dashboard</span></h2>", unsafe_allow_html=True)
+    with colB:
+        st.markdown(f"<p style='text-align:right; color:#7d8590; font-size: 0.85rem; margin-top:15px;'><span style='color:#3fb950; font-weight:700;'>● ONLINE</span> &nbsp;|&nbsp; Updated {datetime.now().strftime('%I:%M:%S %p')}</p>", unsafe_allow_html=True)
+    st.write("")
+
+    # --- LIVE DATA FETCHING ---
+    total_trades, buying_count, selling_count = fetch_kpi_metrics()
+    current_return, current_sharpe, current_drawdown, current_volatility = fetch_portfolio_performance()
+    agent_data = fetch_agent_decisions()
+
+    # --- ROW 1: METRICS ---
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        with st.container(border=True):
+            render_custom_metric("Annual Return", current_return, "Equal-weight portfolio", is_percent=True)
+    with col2:
+        with st.container(border=True):
+            render_custom_metric("Sharpe Ratio", current_sharpe, "Risk-adjusted return")
+    with col3:
+        with st.container(border=True):
+            render_custom_metric("Max Drawdown", current_drawdown, "Peak-to-trough", is_percent=True, invert_colors=True) 
+    with col4:
+        with st.container(border=True):
+            render_custom_metric("Volatility", current_volatility, "Annualised", is_percent=True)
+
+    # --- ROW 2: SIGNALS ---
+    col5, col6, col7, col8 = st.columns(4)
+    with col5:
+        with st.container(border=True):
+            render_custom_metric("Buy Signals", buying_count, f"of {len(ASSETS)} assets")
+    with col6:
+        with st.container(border=True):
+            render_custom_metric("Sell Signals", -abs(selling_count) if selling_count > 0 else 0, f"of {len(ASSETS)} assets")
+    with col7:
+        with st.container(border=True):
+            render_custom_metric("Hold Signals", 0, f"{len(ASSETS) - buying_count - selling_count} of {len(ASSETS)} assets") 
+    with col8:
+        with st.container(border=True):
+            render_custom_metric("Assets Tracked", len(ASSETS), "Stocks + Crypto")
+
+    st.write("")
+
+    # --- ROW 3: CHARTS & LIVE SIGNALS ---
+    signal_col, chart_col = st.columns([1, 2.5])
+    
+    with signal_col:
+        with st.container(border=True):
+            st.markdown("<p style='font-size:0.85rem; font-weight:600; color:#e6edf3; margin-bottom:15px; letter-spacing:0.05em;'>LIVE SIGNALS</p>", unsafe_allow_html=True)
+            
+            # Dynamically map S3 JSON to the dataframe
+            if agent_data:
+                table_data = []
+                for item in agent_data:
+                    sig = item.get('signal', 'HOLD').upper()
+                    icon = "🟢 BUY" if sig == "BUY" else ("🔴 SELL" if sig == "SELL" else "⚪ HOLD")
+                    price_val = item.get('price')
+                    formatted_price = f"${price_val:.2f}" if isinstance(price_val, (int, float)) else "Live"
+                    
+                    table_data.append({"Symbol": item.get('ticker', 'N/A'), "Price": formatted_price, "Signal": icon})
+                df_live = pd.DataFrame(table_data)
             else:
-                return 'color: #8b949e'
-        
-        def colour_conf(val):
+                df_live = pd.DataFrame({"Symbol": ["Awaiting S3 Sync"], "Price": [""], "Signal": [""]})
+                
+            st.dataframe(df_live, width="stretch", hide_index=True)
+
+    with chart_col:
+        with st.container(border=True):
+            selected_asset = st.selectbox("Market Chart Asset", ASSETS, label_visibility="collapsed")
             try:
-                if float(val) >= 0.65:
-                    return 'color: #3fb950'
-                elif float(val) >= 0.45:
-                    return 'color: #d29922'
-                return 'color: #f85149'
-            except:
-                return ''
-        styled = df.style
-        if 'signal' in df.columns:
-            styled = styled.applymap(colour_signal, subset=['signal'])
-        if 'confidence' in df.columns:
-            styled = styled.applymap(colour_conf, subset=['confidence'])
-        
-        st.dataframe(styled, use_container_width=True, hide_index=True)
-except Exception as e:
-    st.error(f"Could not load trade log. {e}")
+                df_chart = fetch_chart_data(selected_asset)
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df_chart.index, open=df_chart['Open'].squeeze(), high=df_chart['High'].squeeze(),
+                    low=df_chart['Low'].squeeze(), close=df_chart['Close'].squeeze(),
+                    increasing_line_color='#3fb950', decreasing_line_color='#f85149'
+                )])
+                fig.update_layout(
+                    template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=0, r=0, t=10, b=0), xaxis_rangeslider_visible=False, height=400,
+                    yaxis=dict(gridcolor='#1e293b'), xaxis=dict(gridcolor='#1e293b')
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception:
+                st.error("Chart data currently unavailable. Waiting for yFinance.")
+
+    st.write("")
+
+    # --- ROW 4: TABS ---
+    tab1, tab2, tab3 = st.tabs(["⚙️ Agent Decision Engine", "📊 Backtesting", "📰 Market News"])
     
-st.divider()
-
-
-# Performance Summary
-
-st.markdown("### 📈 Performance Summary")
-
-try:
-    df_perf = pd.read_sql("SELECT `signal`, COUNT(*) AS count, ROUND(AVG(confidence),3) AS avg_confidence,Round(AVG(price),2) AS avg_price FROM trade_log GROUP BY `signal`", engine)
-    
-    if not df_perf.empty:
-        st.dataframe(df_perf, use_container_width=True, hide_index=True)
-    else:
-        st.markdown("No performance data available yet.")
-except Exception as e:
-    st.error(f"Could not load performance summary. {e}")
+    with tab1:
+        with st.container(border=True):
+            st.markdown("<p style='font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:15px;'>AGENT DECISION ENGINE LOGIC</p>", unsafe_allow_html=True)
             
+            if not agent_data:
+                st.info("Awaiting daily Agentic Workflow sync from AWS S3.")
+            else:
+                for item in agent_data:
+                    ticker = item.get('ticker', 'UNKNOWN')
+                    signal = item.get('signal', 'HOLD').upper()
+                    conf = float(item.get('confidence', 0.5))
+                    reasoning = item.get('reasoning', 'Rule-based decision applied.')
+                    
+                    if signal == "BUY":
+                        bg_color, text_color, icon = "#3fb95033", "#3fb950", "🟢"
+                    elif signal == "SELL":
+                        bg_color, text_color, icon = "#f8514933", "#f85149", "🔴"
+                    else:
+                        bg_color, text_color, icon = "#1e293b", "#c9d1d9", "⚪"
+
+                    col_a, col_b, col_c = st.columns([1.5, 3, 1.5])
+                    with col_a: 
+                        st.markdown(f"<span style='font-weight:700; font-size:1.1rem; color:#e6edf3;'>{ticker}</span> &nbsp;&nbsp; <span style='background-color:{bg_color}; padding:3px 10px; border-radius:4px; font-weight:600; font-size:0.75rem; color:{text_color};'>{icon} {signal}</span>", unsafe_allow_html=True)
+                    with col_b: 
+                        st.progress(conf, text=f"Agent Confidence: {int(conf * 100)}%")
+                    with col_c: 
+                        st.markdown(f"<p style='text-align:right; font-size:0.8rem; color:#7d8590; margin-top:5px;'>RSI: {item.get('rsi', 'N/A')} | Vol: {item.get('volume', 'N/A')}</p>", unsafe_allow_html=True)
+                    
+                    st.caption(f"*Agent Rationale:* {reasoning}")
+                    st.divider()
+
+    with tab2:
+        with st.container(border=True):
+            try:
+                df_backtest = pd.read_csv("data/backtest_summary.csv")
+                def style_dataframe(val):
+                    try:
+                        num = float(str(val).replace('%', ''))
+                        if num > 0: return 'color: #3fb950;'
+                        elif num < 0: return 'color: #f85149;'
+                    except: pass
+                    return 'color: #8b949e;'
+                st.dataframe(df_backtest.style.map(style_dataframe), width="stretch", hide_index=True)
+            except Exception:
+                st.info("Upload backtest_summary.csv to data/ to view this section.")
+
+    with tab3:
+        with st.container(border=True):
+            st.markdown("**United Airlines, flight attendants reach labor deal...**")
+            st.caption("cnbc_finance • 3/26/2026")
+            st.divider()
+            st.markdown("**Is Trump losing his grip on the stock market? Sustained declines suggest...**")
+            st.caption("marketwatch • 3/26/2026")
+
+if __name__ == "__main__":
+    main()
