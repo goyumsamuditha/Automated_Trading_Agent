@@ -48,18 +48,19 @@ st.markdown("""
 # 2. DATA CONNECTIONS (FULLY LIVE)
 # ==========================================
 @st.cache_resource
-def get_aws_client():
-    session = boto3.Session(
-        aws_access_key_id=os.getenv('AWS_ACCESS_KEY'),
-        aws_secret_access_key=os.getenv('AWS_SECRET_KEY'),
-        region_name=os.getenv('AWS_REGION', 'eu-north-1')
+def get_r2_client():
+    return boto3.client(
+        's3',
+        endpoint_url=f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com",
+        aws_access_key_id=os.getenv('R2_ACCESS_KEY'),
+        aws_secret_access_key=os.getenv('R2_SECRET_KEY'),
+        region_name='auto',
     )
     return session.client('s3')
 
 @st.cache_resource
 def get_db_engine():
-    DB_URL = f'mysql+pymysql://{os.getenv("RDS_USER")}:{os.getenv("RDS_PASSWORD")}@{os.getenv("RDS_HOST")}:3306/{os.getenv("RDS_DB","database-1")}'
-    return create_engine(DB_URL, pool_pre_ping=True, pool_recycle=3600)
+    return create_engine(os.getenv("SUPABASE_DB_URL"), pool_pre_ping=True, pool_recycle=3600)
 
 @st.cache_data(ttl=900)
 def fetch_kpi_metrics():
@@ -94,8 +95,8 @@ def fetch_chart_data(ticker):
 def fetch_agent_decisions():
     """Fetches the latest agent decisions from S3."""
     try:
-        s3 = get_aws_client()
-        bucket = os.getenv('S3_BUCKET', 'goyum-trading-data')
+        s3 = get_r2_client()
+        bucket = os.getenv('R2_BUCKET', 'goyum-trading-data')
         response = s3.list_objects_v2(Bucket=bucket, Prefix='signals/')
         if 'Contents' not in response: return []
         latest_file = sorted(response['Contents'], key=lambda x: x['LastModified'])[-1]['Key']
