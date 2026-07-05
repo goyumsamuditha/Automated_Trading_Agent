@@ -1,0 +1,20 @@
+name: Daily Trading Pipeline
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # runs 8:00 AM Sri Lanka time (UTC+5:30)
+  workflow_dispatch:        # lets you trigger it manually too
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python src/pipline.py
+        env:
+          NEWS_API_KEY: ${{ secrets.edea65c40c0a4e56be20d4e7902848db }}
+          DB_PASSWORD: ${{ secrets.hpHhMq1dFfEy7a0ekTF4 }}
