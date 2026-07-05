@@ -9,13 +9,13 @@ from pathlib import Path
 load_dotenv()
 s3 = boto3.client(
     's3',
-    aws_access_key_id = os.getenv('AWS_ACCESS_KEY') ,       # access key
-    aws_secret_access_key = os.getenv('AWS_SECRET_KEY'),    # secret key
-    region_name           = os.getenv('AWS_REGION', 'eu-north-1'), # region
-
+    endpoint_url=f"https://{os.getenv('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com",
+    aws_access_key_id=os.getenv('R2_ACCESS_KEY'),
+    aws_secret_access_key=os.getenv('R2_SECRET_KEY'),
+    region_name='auto',
 )
 
-bucket = os.getenv('S3_BUCKET')  
+bucket = os.getenv('R2_BUCKET')  
 base = Path(__file__).resolve().parent.parent.parent  # base directory of the project
 
 def upload_file_to_s3(file_path, s3_key):   
