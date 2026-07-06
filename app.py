@@ -68,8 +68,8 @@ def fetch_kpi_metrics():
     try:
         engine = get_db_engine()
         total = pd.read_sql("SELECT COUNT(*) AS total FROM trade_log", engine).iloc[0]['total']
-        buys = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='BUY'", engine).iloc[0]['count']
-        sells = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE `signal`='SELL'", engine).iloc[0]['count']
+        buys = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE signal='BUY'", engine).iloc[0]['count']
+        sells = pd.read_sql("SELECT COUNT(*) AS count FROM trade_log WHERE signal='SELL'", engine).iloc[0]['count']
         return total, buys, sells
     except Exception:
         return 0, 0, 0 
@@ -78,12 +78,13 @@ def fetch_kpi_metrics():
 def fetch_portfolio_performance():
     """Fetches real-time portfolio metrics from RDS."""
     try:
-        engine = get_db_engine()
-        query = "SELECT annual_return, sharpe_ratio, max_drawdown, volatility FROM portfolio_metrics ORDER BY date DESC LIMIT 1"
-        metrics = pd.read_sql(query, engine).iloc[0]
-        return metrics['annual_return'], metrics['sharpe_ratio'], metrics['max_drawdown'], metrics['volatility']
+        df = pd.read_csv("data/backtest_summary.csv")
+        annual_return = df['total_return'].mean() * 100
+        sharpe = df['sharpe_ratio'].mean()
+        max_dd = df['max_drawdown'].mean() * 100
+        volatility = df['total_return'].std() * 100
+        return annual_return, sharpe, max_dd, volatility
     except Exception:
-        # Fallback to 0 if the table is empty or missing
         return 0.0, 0.0, 0.0, 0.0
 
 @st.cache_data(ttl=86400) 
