@@ -5,6 +5,7 @@ steps = [
     ('market analysis', 'src/market_analysis.py'),
     ('Information Retreval', 'src/info_retreval.py'),
     ('Model Train', 'src/decision_engine.py'),
+    ('Generate Signals', 'src/generate_signals.py'),
     ('Backtest', 'src/backtest.py'),
     ('upload to S3', 'src/cloud/S3_bucket.py'),
 ]
