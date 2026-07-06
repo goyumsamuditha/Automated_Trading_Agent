@@ -50,11 +50,11 @@ def backtest_asset(data, initial_capital=100000):
             if shares_to_buy > 0: # If there are shares to buy
                 shares += shares_to_buy # Update the total shares held
                 cash -= shares_to_buy * price # Deduct the cost of buying shares from cash
-                log_trade(str(date.date()), 'BUY', safe, shares_to_buy, price, conf, 'Backtest Buy') # Log the trade in the database
+                log_trade(ticker=safe, signal_date=str(date.date()), signal='BUY', confidence=conf, price=price, quantity=shares_to_buy, reason='Backtest Buy') # Log the trade in the database
             
         elif row['predicted_signal'] == 0 and conf >= 0.45 and shares > 0: # If the predicted signal is 'Sell', confidence is above threshold, and there are shares to sell
             cash += shares * price # Add the proceeds from selling shares to cash
-            log_trade(str(date.date()), 'SELL', safe, shares, price, conf, 'Backtest Sell') # Log the trade in the database
+            log_trade(ticker=safe, signal_date=str(date.date()), signal='SELL', confidence=conf, price=price, quantity=shares, reason='Backtest Sell') # Log the trade in the database
             shares = 0 # Reset shares to zero after selling
             
         portfolio_values.append(cash + shares * price) # Calculate and store the current portfolio value (cash + value of held shares)
