@@ -26,7 +26,6 @@ def create_table():
                 inserted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         '''))
-        conn.execute(text("DROP TABLE IF EXISTS trade_log"))
         conn.execute(text('''
             CREATE TABLE IF NOT EXISTS trade_log (
                 id          SERIAL PRIMARY KEY,
