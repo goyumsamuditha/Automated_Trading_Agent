@@ -44,8 +44,12 @@ def main():
         try:
             df = yf.download(ticker, period='100d', progress=False)
             if df.empty:
-                results.append({'ticker': ticker, 'error': 'No data returned'})
-                continue
+             results.append({'ticker': ticker, 'error': 'No data returned'})
+             continue
+            if isinstance(df.columns, pd.MultiIndex):
+             df.columns = df.columns.get_level_values(0)
+
+              
             df = add_features(df)
             latest_raw = df[FEATURES].iloc[-1:]
             latest_scaled = scaler.transform(latest_raw)
