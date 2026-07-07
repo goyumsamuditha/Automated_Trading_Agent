@@ -13,11 +13,8 @@ from src.cloud.S3_bucket import upload_file_to_s3  # reuses your existing R2-con
  
 ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'IBM', 'BTC-USD', 'ETH-USD']
  
-FEATURES = [
-    'Open', 'High', 'Low', 'Close', 'Volume',
-    'RSI_14', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal',
-    'RSI_Signal', 'MACD_Crossover', 'sentiment_score'
-]
+FEATURES = ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI_14', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal', 'sentiment_score', 'RSI_Signal', 'MACD_Crossover']
+
  
  
 def add_features(df):
