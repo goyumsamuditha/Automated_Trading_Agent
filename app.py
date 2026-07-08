@@ -85,7 +85,7 @@ def fetch_kpi_metrics():
 
 @st.cache_data(ttl=900)
 def fetch_portfolio_performance():
-    """Fetches real-time portfolio metrics from RDS."""
+    """Fetches portfolio metrics from the backtest summary."""
     try:
         df = pd.read_csv("data/backtest_summary.csv")
         annual_return = df['total_return'].median() * 100
