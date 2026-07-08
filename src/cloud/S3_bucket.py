@@ -48,7 +48,7 @@ def upload_featured_data():
 def upload_models():
     """ Upload all model files from the local directory to the S3 bucket"""
     local_dir = base / 'models'
-    for filename in ['decision_engine.pkl', 'scaler.pkl']:
+    for filename in ['decision_engine.pkl', 'scaler.pkl','metrics.json']:
         filepath = local_dir / filename # construct full file path  
         if filepath.exists():  # check if file exists
             upload_file_to_s3(filepath, f'models/{filename}')  # upload each file to S3 under the 'models/' prefix
