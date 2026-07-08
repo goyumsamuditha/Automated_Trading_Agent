@@ -90,6 +90,9 @@ def fetch_portfolio_performance():
 @st.cache_data(ttl=86400) 
 def fetch_chart_data(ticker):
     """Fetches live pricing data from Yahoo Finance."""
+    df = yf.download(ticker, period="6mo", interval="1d", progress=False)
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = df.columns.get_level_values(0)
     return yf.download(ticker, period="6mo", interval="1d", progress=False)
 
 @st.cache_data(ttl=300) 
@@ -212,19 +215,22 @@ def main():
             selected_asset = st.selectbox("Market Chart Asset", ASSETS, label_visibility="collapsed")
             try:
                 df_chart = fetch_chart_data(selected_asset)
-                fig = go.Figure(data=[go.Candlestick(
-                    x=df_chart.index, open=df_chart['Open'].squeeze(), high=df_chart['High'].squeeze(),
-                    low=df_chart['Low'].squeeze(), close=df_chart['Close'].squeeze(),
-                    increasing_line_color='#3fb950', decreasing_line_color='#f85149'
-                )])
+                if df_chart.empty:
+                    st.warning(f"No chart data returned for {selected_asset} — this can happen with Yahoo Finance rate limits. Try again in a moment.")
+                else:
+                    fig = go.Figure(data=[go.Candlestick(
+                        x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
+                        low=df_chart['Low'], close=df_chart['Close'],
+                        increasing_line_color='#3fb950', decreasing_line_color='#f85149'
+                    )])
                 fig.update_layout(
                     template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     margin=dict(l=0, r=0, t=10, b=0), xaxis_rangeslider_visible=False, height=400,
                     yaxis=dict(gridcolor='#1e293b'), xaxis=dict(gridcolor='#1e293b')
                 )
                 st.plotly_chart(fig, use_container_width=True)
-            except Exception:
-                st.error("Chart data currently unavailable. Waiting for yFinance.")
+            except Exception as e:
+                st.error(f"Chart data currently unavailable: {e}")
 
     st.write("")
 
