@@ -6,7 +6,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 import seaborn as sns
-import joblib,os
+import joblib, os, json
 import sys
 import os
 sys.path.append(os.getcwd()) # add the current working directory to the system path to allow imports from src
@@ -85,10 +85,23 @@ plt.savefig('data/plots/feature_importance.png') # save the plot to a file
 plt.show() # display the plot
 
 # save the model and scaler for future use
+# save the model and scaler for future use
 os.makedirs('models', exist_ok=True) # create the directory for saving models if it doesn't exist
 joblib.dump(model, 'models/decision_engine.pkl') # save the trained model to a file
 joblib.dump(scaler, 'models/scaler.pkl') # save the scaler to a file
 print("Model and scaler saved to 'models/' directory.") # print a message indicating that the model and scaler have been saved
+
+# save headline metrics for the dashboard's Model Insights tab
+report_dict = classification_report(y_test, y_pred, target_names=['Sell', 'Hold', 'Buy'], output_dict=True)
+metrics = {
+    'accuracy': accuracy_score(y_test, y_pred),
+    'precision_buy': report_dict['Buy']['precision'],
+    'recall_buy': report_dict['Buy']['recall'],
+    'trained_at': pd.Timestamp.now().strftime('%Y-%m-%d %H:%M'),
+}
+with open('models/metrics.json', 'w') as f:
+    json.dump(metrics, f, indent=2)
+print("Model metrics saved to 'models/metrics.json'.")
 
 
 # Upload the model and scaler to S3
