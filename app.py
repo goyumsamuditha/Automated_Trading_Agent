@@ -88,9 +88,9 @@ def fetch_portfolio_performance():
     """Fetches real-time portfolio metrics from RDS."""
     try:
         df = pd.read_csv("data/backtest_summary.csv")
-        annual_return = df['total_return'].mean() * 100
-        sharpe = df['sharpe_ratio'].mean()
-        max_dd = df['max_drawdown'].mean() * 100
+        annual_return = df['total_return'].median() * 100
+        sharpe = df['sharpe_ratio'].median()
+        max_dd = df['max_drawdown'].median() * 100
         volatility = df['total_return'].std() * 100
         return annual_return, sharpe, max_dd, volatility
     except Exception:
@@ -167,6 +167,11 @@ def main():
     current_return, current_sharpe, current_drawdown, current_volatility = fetch_portfolio_performance()
     agent_data = fetch_agent_decisions()
 
+    buy_count = sum(1 for item in agent_data if item.get('signal', '').upper() == 'BUY')
+    sell_count = sum(1 for item in agent_data if item.get('signal', '').upper() == 'SELL')
+    hold_count = sum(1 for item in agent_data if item.get('signal', '').upper() == 'HOLD')
+    total_assets = len(agent_data) if agent_data else len(ASSETS)
+
     # --- ROW 1: METRICS ---
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -186,13 +191,13 @@ def main():
     col5, col6, col7, col8 = st.columns(4)
     with col5:
         with st.container(border=True):
-            render_custom_metric("Buy Signals", buying_count, f"of {len(ASSETS)} assets")
+            render_custom_metric("Buy Signals", buy_count, f"of {total_assets} assets")
     with col6:
         with st.container(border=True):
-            render_custom_metric("Sell Signals", -abs(selling_count) if selling_count > 0 else 0, f"of {len(ASSETS)} assets")
+            render_custom_metric("Sell Signals", -sell_count if sell_count > 0 else 0, f"of {total_assets} assets")
     with col7:
         with st.container(border=True):
-            render_custom_metric("Hold Signals", 0, f"{len(ASSETS) - buying_count - selling_count} of {len(ASSETS)} assets") 
+            render_custom_metric("Hold Signals", hold_count, f"of {total_assets} assets")
     with col8:
         with st.container(border=True):
             render_custom_metric("Assets Tracked", len(ASSETS), "Stocks + Crypto")
