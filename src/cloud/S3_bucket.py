@@ -60,7 +60,15 @@ def upload_plots():
         if filename.endswith('.png'):
             upload_file_to_s3(str(local_dir / filename), f'plots/{filename}')  # upload each file to S3 under the 'plots/' prefix
 
-
+def upload_data_files():
+    """Upload sentiment scores and backtest summary CSVs to R2."""
+    files_to_upload = [
+        (base / 'data' / 'sentiment_scores.csv', 'data/sentiment_scores.csv'),
+        (base / 'data' / 'backtest_summary.csv', 'data/backtest_summary.csv'),
+    ]
+    for filepath, s3_key in files_to_upload:
+        if filepath.exists():
+            upload_file_to_s3(str(filepath), s3_key)
 def download_data_EC2():
     """Download all files from S3 to EC2"""
     objects = s3.list_objects_v2(Bucket=bucket).get('Contents',[])  # list all objects in the S3 bucket
