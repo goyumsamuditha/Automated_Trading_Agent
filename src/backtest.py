@@ -105,4 +105,6 @@ if __name__ == "__main__":
     print(summary_df) # Print the summary DataFrame with backtest results for all assets
     summary_df.to_csv('data/backtest_summary.csv') # Save the backtest summary to a CSV file
     upload_plots() # Upload the generated plots to the S3 bucket
+    from src.cloud.S3_bucket import upload_data_files
+    upload_data_files() # Upload sentiment_scores.csv and backtest_summary.csv to R2
     print("Backtest completed and results saved.") # Print a message indicating that the backtest is completed and results are saved
