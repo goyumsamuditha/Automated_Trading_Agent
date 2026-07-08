@@ -15,7 +15,7 @@ from datetime import datetime
 st.set_page_config(page_title="Agentic Trading Dashboard", layout="wide", initial_sidebar_state="collapsed")
 load_dotenv()
 
-ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'TSLA', 'JPM', 'GS', 'BAC', 'BTC-USD', 'ETH-USD']
+ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'IBM', 'BTC-USD', 'ETH-USD']
 
 st.markdown("""
     <style>
@@ -57,7 +57,16 @@ def get_r2_client():
         region_name='auto',
     )
     return session.client('s3')
-
+@st.cache_data(ttl=900)
+def fetch_r2_json(key):
+    """Fetch a JSON file from R2."""
+    try:
+        s3 = get_r2_client()
+        bucket = os.getenv('R2_BUCKET')
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        return json.loads(obj['Body'].read().decode('utf-8'))
+    except Exception:
+        return None
 @st.cache_resource
 def get_db_engine():
     return create_engine(os.getenv("SUPABASE_DB_URL"), pool_pre_ping=True, pool_recycle=3600)
@@ -90,10 +99,13 @@ def fetch_portfolio_performance():
 @st.cache_data(ttl=86400) 
 def fetch_chart_data(ticker):
     """Fetches live pricing data from Yahoo Finance."""
-    df = yf.download(ticker, period="6mo", interval="1d", progress=False)
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    return yf.download(ticker, period="6mo", interval="1d", progress=False)
+    chart_json = fetch_r2_json('signals/chart_history_latest.json')
+    if not chart_json or ticker not in chart_json or not chart_json[ticker]:
+        return pd.DataFrame()
+    df = pd.DataFrame(chart_json[ticker])
+    df['Date'] = pd.to_datetime(df['Date'])
+    df.set_index('Date', inplace=True)
+    return df
 
 @st.cache_data(ttl=300) 
 def fetch_agent_decisions():
@@ -213,24 +225,21 @@ def main():
     with chart_col:
         with st.container(border=True):
             selected_asset = st.selectbox("Market Chart Asset", ASSETS, label_visibility="collapsed")
-            try:
-                df_chart = fetch_chart_data(selected_asset)
-                if df_chart.empty:
-                    st.warning(f"No chart data returned for {selected_asset} — this can happen with Yahoo Finance rate limits. Try again in a moment.")
-                else:
-                    fig = go.Figure(data=[go.Candlestick(
-                        x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
-                        low=df_chart['Low'], close=df_chart['Close'],
-                        increasing_line_color='#3fb950', decreasing_line_color='#f85149'
-                    )])
+            df_chart = fetch_chart_data(selected_asset)
+            if df_chart.empty:
+                st.warning(f"No chart data synced yet for {selected_asset}. This updates daily via the pipeline.")
+            else:
+                fig = go.Figure(data=[go.Candlestick(
+                    x=df_chart.index, open=df_chart['Open'], high=df_chart['High'],
+                    low=df_chart['Low'], close=df_chart['Close'],
+                    increasing_line_color='#3fb950', decreasing_line_color='#f85149'
+                )])
                 fig.update_layout(
                     template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
                     margin=dict(l=0, r=0, t=10, b=0), xaxis_rangeslider_visible=False, height=400,
                     yaxis=dict(gridcolor='#1e293b'), xaxis=dict(gridcolor='#1e293b')
                 )
                 st.plotly_chart(fig, use_container_width=True)
-            except Exception as e:
-                st.error(f"Chart data currently unavailable: {e}")
 
     st.write("")
 
