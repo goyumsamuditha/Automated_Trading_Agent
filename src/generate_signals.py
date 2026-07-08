@@ -32,21 +32,21 @@ def add_features(df):
  
  
 def main():
-    model = joblib.load('models/decision_engine.pkl')   # freshly trained earlier in this same pipeline run
+    model = joblib.load('models/decision_engine.pkl')
     scaler = joblib.load('models/scaler.pkl')
     today = datetime.today().strftime('%Y-%m-%d')
     results = []
- 
+
     for ticker in ASSETS:
         try:
             df = yf.download(ticker, period='100d', progress=False)
             if df.empty:
-             results.append({'ticker': ticker, 'error': 'No data returned'})
-             continue
-            if isinstance(df.columns, pd.MultiIndex):
-             df.columns = df.columns.get_level_values(0)
+                results.append({'ticker': ticker, 'error': 'No data returned'})
+                continue
 
-              
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
             df = add_features(df)
             latest_raw = df[FEATURES].iloc[-1:]
             latest_scaled = scaler.transform(latest_raw)
@@ -64,10 +64,20 @@ def main():
             })
         except Exception as e:
             results.append({'ticker': ticker, 'error': str(e)})
+
+    os.makedirs('data/signals', exist_ok=True)
+    local_path = f'data/signals/signals_{today}.json'
+    with open(local_path, 'w') as f:
+        json.dump(results, f, indent=2)
+
+    upload_file_to_s3(local_path, f'signals/signals_{today}.json')
+    print(f'Signals generated and uploaded for {today}.')
+
+    # Also save recent price history for each asset, so the dashboard never needs live yfinance calls
     chart_data = {}
     for ticker in ASSETS:
         try:
-         df_hist = yf.download(ticker, period="6mo", interval="1d", progress=False)
+            df_hist = yf.download(ticker, period="6mo", interval="1d", progress=False)
             if isinstance(df_hist.columns, pd.MultiIndex):
                 df_hist.columns = df_hist.columns.get_level_values(0)
             df_hist = df_hist.reset_index()
@@ -75,19 +85,13 @@ def main():
             chart_data[ticker] = df_hist[['Date', 'Open', 'High', 'Low', 'Close']].to_dict('records')
         except Exception:
             chart_data[ticker] = []
-      chart_path = 'data/signals/chart_history_latest.json'
-      with open(chart_path, 'w') as f:
-       json.dump(chart_data, f)
-      upload_file_to_s3(chart_path, 'signals/chart_history_latest.json')
- 
-    os.makedirs('data/signals', exist_ok=True)
-    local_path = f'data/signals/signals_{today}.json'
-    with open(local_path, 'w') as f:
-        json.dump(results, f, indent=2)
- 
-    upload_file_to_s3(local_path, f'signals/signals_{today}.json')
-    print(f'Signals generated and uploaded for {today}.')
- 
- 
+
+    chart_path = 'data/signals/chart_history_latest.json'
+    with open(chart_path, 'w') as f:
+        json.dump(chart_data, f)
+    upload_file_to_s3(chart_path, 'signals/chart_history_latest.json')
+    print('Chart history uploaded.')
+
+
 if __name__ == '__main__':
     main()
