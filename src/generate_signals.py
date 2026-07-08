@@ -64,6 +64,21 @@ def main():
             })
         except Exception as e:
             results.append({'ticker': ticker, 'error': str(e)})
+    chart_data = {}
+    for ticker in ASSETS:
+        try:
+         df_hist = yf.download(ticker, period="6mo", interval="1d", progress=False)
+            if isinstance(df_hist.columns, pd.MultiIndex):
+                df_hist.columns = df_hist.columns.get_level_values(0)
+            df_hist = df_hist.reset_index()
+            df_hist['Date'] = df_hist['Date'].astype(str)
+            chart_data[ticker] = df_hist[['Date', 'Open', 'High', 'Low', 'Close']].to_dict('records')
+        except Exception:
+            chart_data[ticker] = []
+      chart_path = 'data/signals/chart_history_latest.json'
+      with open(chart_path, 'w') as f:
+       json.dump(chart_data, f)
+      upload_file_to_s3(chart_path, 'signals/chart_history_latest.json')
  
     os.makedirs('data/signals', exist_ok=True)
     local_path = f'data/signals/signals_{today}.json'
