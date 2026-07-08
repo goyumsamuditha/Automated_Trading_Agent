@@ -291,7 +291,7 @@ def main():
     st.write("")
 
     # --- ROW 4: TABS ---
-    tab1, tab2, tab3 = st.tabs(["⚙️ Agent Decision Engine", "📊 Backtesting", "📰 Market News", "🧠 Model Insights"])
+    tab1, tab2, tab3, tab4 = st.tabs(["⚙️ Agent Decision Engine", "📊 Backtesting", "📰 Market News", "🧠 Model Insights"])
     
     with tab1:
         with st.container(border=True):
