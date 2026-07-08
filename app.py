@@ -250,6 +250,24 @@ def main():
                 df_live = pd.DataFrame({"Symbol": ["Awaiting S3 Sync"], "Price": [""], "Signal": [""]})
                 
             st.dataframe(df_live, width="stretch", hide_index=True)
+        with st.container(border=True):
+            st.markdown("<p style='font-size:0.85rem; font-weight:600; color:#e6edf3; margin-bottom:15px;'>NEWS SENTIMENT</p>", unsafe_allow_html=True)
+            sentiment_df = fetch_r2_csv('data/sentiment_scores.csv')
+            if sentiment_df is not None and not sentiment_df.empty:
+                fig_sent = go.Figure(go.Bar(
+                    x=sentiment_df['sentiment_score'],
+                    y=sentiment_df['symbol'],
+                    orientation='h',
+                    marker_color=['#3fb950' if v >= 0 else '#f85149' for v in sentiment_df['sentiment_score']]
+                ))
+                fig_sent.update_layout(
+                    template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',
+                    margin=dict(l=0, r=0, t=10, b=0), height=280,
+                    xaxis=dict(gridcolor='#1e293b', title=None), yaxis=dict(gridcolor='#1e293b', title=None)
+                )
+                st.plotly_chart(fig_sent, use_container_width=True)
+            else:
+                st.caption("Sentiment data not yet synced.")
 
     with chart_col:
         with st.container(border=True):
@@ -273,7 +291,7 @@ def main():
     st.write("")
 
     # --- ROW 4: TABS ---
-    tab1, tab2, tab3 = st.tabs(["⚙️ Agent Decision Engine", "📊 Backtesting", "📰 Market News"])
+    tab1, tab2, tab3 = st.tabs(["⚙️ Agent Decision Engine", "📊 Backtesting", "📰 Market News", "🧠 Model Insights"])
     
     with tab1:
         with st.container(border=True):
@@ -320,6 +338,19 @@ def main():
                 st.dataframe(df_backtest.style.map(style_dataframe), width="stretch", hide_index=True)
             except Exception:
                 st.info("Upload backtest_summary.csv to data/ to view this section.")
+        st.write("")
+        with st.container(border=True):
+            st.markdown("<p style='font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:15px;'>RECENT TRADE LOG</p>", unsafe_allow_html=True)
+            try:
+                engine = get_db_engine()
+                recent_trades = pd.read_sql(
+                    "SELECT ticker, signal_date, signal, quantity, price, confidence, reason FROM trade_log ORDER BY inserted_at DESC LIMIT 20",
+                    engine
+                )
+                st.dataframe(recent_trades, width="stretch", hide_index=True)
+            except Exception:
+                st.info("Trade log not available yet.")
+        
 
     with tab3:
         with st.container(border=True):
@@ -334,5 +365,50 @@ def main():
                     st.info("News headlines not yet synced. Re-run the pipeline to populate this.")
             except Exception:
                 st.info("News data not yet available.")
+    with tab4:
+        with st.container(border=True):
+            st.markdown("<p style='font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:15px;'>MODEL PERFORMANCE</p>", unsafe_allow_html=True)
+
+            metrics = fetch_r2_json('models/metrics.json')
+            if metrics:
+                m1, m2, m3, m4 = st.columns(4)
+                with m1:
+                    render_custom_metric("Accuracy", metrics['accuracy'] * 100, "Test set", is_percent=True)
+                with m2:
+                    render_custom_metric("Buy Precision", metrics['precision_buy'] * 100, "Of predicted buys", is_percent=True)
+                with m3:
+                    render_custom_metric("Buy Recall", metrics['recall_buy'] * 100, "Of actual buys caught", is_percent=True)
+                with m4:
+                    st.markdown(f"<p style='color:#7d8590; font-size:0.75rem; margin-top:20px;'>Last trained</p><p style='color:#e6edf3; font-size:1rem;'>{metrics['trained_at']}</p>", unsafe_allow_html=True)
+            else:
+                st.info("Model metrics not yet synced from R2.")
+
+            st.divider()
+
+            img_col1, img_col2 = st.columns(2)
+            with img_col1:
+                st.markdown("<p style='color:#8b949e; font-size:0.8rem;'>Confusion Matrix</p>", unsafe_allow_html=True)
+                cm_bytes = fetch_r2_image('plots/confusion_matrix.png')
+                if cm_bytes:
+                    st.image(cm_bytes, use_container_width=True)
+                else:
+                    st.caption("Not available yet.")
+            with img_col2:
+                st.markdown("<p style='color:#8b949e; font-size:0.8rem;'>Feature Importance</p>", unsafe_allow_html=True)
+                fi_bytes = fetch_r2_image('plots/feature_importance.png')
+                if fi_bytes:
+                    st.image(fi_bytes, use_container_width=True)
+                else:
+                    st.caption("Not available yet.")
+
+            st.divider()
+            st.markdown("<p style='font-size:0.8rem; font-weight:600; color:#fff; margin-bottom:15px;'>PER-ASSET BACKTEST CURVE</p>", unsafe_allow_html=True)
+            asset_choice = st.selectbox("Select asset", ASSETS, key="backtest_asset_picker")
+            safe_name = asset_choice.replace('-', '_')
+            curve_bytes = fetch_r2_image(f'plots/{safe_name}_backtest.png')
+            if curve_bytes:
+                st.image(curve_bytes, use_container_width=True)
+            else:
+                st.caption(f"No backtest plot found for {asset_choice} yet.")
 if __name__ == "__main__":
     main()
