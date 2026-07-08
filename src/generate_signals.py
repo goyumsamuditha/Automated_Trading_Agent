@@ -72,6 +72,17 @@ def main():
             pred = model.predict(latest_scaled)[0]
             proba = model.predict_proba(latest_scaled)[0].max()
             label = {0: 'SELL', 1: 'HOLD', 2: 'BUY'}[pred]
+
+            rsi_val = float(latest_raw['RSI_14'].values[0])
+            macd_cross = float(latest_raw['MACD_Crossover'].values[0])
+            reasons = []
+            if rsi_val < 30:
+                reasons.append("RSI signals oversold")
+            elif rsi_val > 70:
+                reasons.append("RSI signals overbought")
+            reasons.append("MACD bullish crossover" if macd_cross == 1 else "MACD bearish crossover")
+            reasoning = "; ".join(reasons)
+
             results.append({
                 'ticker': ticker,
                 'date': today,
@@ -80,6 +91,7 @@ def main():
                 'price': round(float(df['Close'].iloc[-1]), 2),
                 'rsi': round(float(df['RSI_14'].iloc[-1]), 1),
                 'volume': int(df['Volume'].iloc[-1]),
+                'reasoning': reasoning,
             })
         except Exception as e:
             results.append({'ticker': ticker, 'error': str(e)})
