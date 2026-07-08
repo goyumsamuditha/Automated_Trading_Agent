@@ -3,6 +3,7 @@ import pandas as pd
 import boto3
 import json
 import os
+import io
 import yfinance as yf
 import plotly.graph_objects as go
 from sqlalchemy import create_engine
@@ -57,6 +58,17 @@ def get_r2_client():
         region_name='auto',
     )
     return session.client('s3')
+@st.cache_data(ttl=900)
+def fetch_r2_csv(key):
+    """Fetch a CSV file from R2 and return as a DataFrame."""
+    try:
+        s3 = get_r2_client()
+        bucket = os.getenv('R2_BUCKET')
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        return pd.read_csv(io.BytesIO(obj['Body'].read()))
+    except Exception:
+        return None
+        
 @st.cache_data(ttl=900)
 def fetch_r2_json(key):
     """Fetch a JSON file from R2."""
@@ -299,14 +311,16 @@ def main():
 
     with tab3:
         with st.container(border=True):
-            with st.container(border=True):
-            news_df = fetch_r2_csv('data/sentiment_scores.csv')
-            if news_df is not None and 'headline' in news_df.columns:
-                for _, row in news_df.iterrows():
-                    st.markdown(f"**{row['headline']}**")
-                    st.caption(f"{row['keyword']} • {row['date']}")
-                    st.divider()
-            else:
-                st.info("News headlines not yet synced.")
+            try:
+                news_df = fetch_r2_csv('data/sentiment_scores.csv')
+                if news_df is not None and 'headline' in news_df.columns:
+                    for _, row in news_df.iterrows():
+                        st.markdown(f"**{row['headline']}**")
+                        st.caption(f"{row['keyword']} • {row['date']}")
+                        st.divider()
+                else:
+                    st.info("News headlines not yet synced. Re-run the pipeline to populate this.")
+            except Exception:
+                st.info("News data not yet available.")
 if __name__ == "__main__":
     main()
