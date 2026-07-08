@@ -2,21 +2,20 @@ import json
 import os
 import sys
 from datetime import datetime
- 
+
 import joblib
 import pandas as pd
 import yfinance as yf
 import ta
- 
-sys.path.append(os.getcwd())  # allow imports from src when run as a script
-from src.cloud.S3_bucket import upload_file_to_s3  # reuses your existing R2-configured client
- 
+
+sys.path.append(os.getcwd())
+from src.cloud.S3_bucket import upload_file_to_s3
+
 ASSETS = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'IBM', 'BTC-USD', 'ETH-USD']
- 
+
 FEATURES = ['Open', 'High', 'Low', 'Close', 'Volume', 'RSI_14', 'SMA_20', 'SMA_50', 'MACD', 'MACD_Signal', 'sentiment_score', 'RSI_Signal', 'MACD_Crossover']
 
- 
- 
+
 def add_features(df):
     close = df['Close'].squeeze()
     df['SMA_20'] = ta.trend.sma_indicator(close, 20)
@@ -27,10 +26,10 @@ def add_features(df):
     df['MACD_Signal'] = macd_obj.macd_signal()
     df['RSI_Signal'] = ((df['RSI_14'] < 30).astype(int) - (df['RSI_14'] > 70).astype(int))
     df['MACD_Crossover'] = (df['MACD'] > df['MACD_Signal']).astype(int) * 2 - 1
-    df['sentiment_score'] = 0.1  # placeholder; wire in real sentiment_scores.csv lookup if desired
+    df['sentiment_score'] = 0.1
     return df.dropna()
- 
- 
+
+
 def main():
     model = joblib.load('models/decision_engine.pkl')
     scaler = joblib.load('models/scaler.pkl')
@@ -41,26 +40,7 @@ def main():
         try:
             df = yf.download(ticker, period='100d', progress=False)
             if df.empty:
-             rsi_val = float(latest_raw['RSI_14'].values[0])
-             macd_cross = float(latest_raw['MACD_Crossover'].values[0])
-             reasons = []
-            if rsi_val < 30:
-                reasons.append("RSI signals oversold")
-            elif rsi_val > 70:
-                reasons.append("RSI signals overbought")
-            reasons.append("MACD bullish crossover" if macd_cross == 1 else "MACD bearish crossover")
-            reasoning = "; ".join(reasons)
-            
-                results.append({
-                'ticker': ticker,
-                'date': today,
-                'signal': label,
-                'confidence': round(float(proba), 3),
-                'price': round(float(df['Close'].iloc[-1]), 2),
-                'rsi': round(float(df['RSI_14'].iloc[-1]), 1),
-                'volume': int(df['Volume'].iloc[-1]),
-                'reasoning': reasoning,
-            })
+                results.append({'ticker': ticker, 'error': 'No data returned'})
                 continue
 
             if isinstance(df.columns, pd.MultiIndex):
@@ -104,7 +84,6 @@ def main():
     upload_file_to_s3(local_path, f'signals/signals_{today}.json')
     print(f'Signals generated and uploaded for {today}.')
 
-    # Also save recent price history for each asset, so the dashboard never needs live yfinance calls
     chart_data = {}
     for ticker in ASSETS:
         try:
