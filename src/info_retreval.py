@@ -60,8 +60,9 @@ def get_sentiment_scores():
         print(f"Fetching news for {keyword}...")
         headlines = fetch_news_data(keyword) # fetch news headlines for the keyword
         sentiment_score = analyze_sentiment(headlines) # analyze the sentiment of the headlines
-        print(f"Sentiment score for {keyword}: {sentiment_score}")
+        
         top_headline = headlines[0] if headlines else "No recent headlines"
+        print(f"Sentiment score for {keyword}: {sentiment_score}")
         sentiment_data.append({'symbol': symbol, 'keyword': keyword, 'sentiment_score': sentiment_score, 'date': today, 'headline': top_headline}) # append the results to the list
     df = pd.DataFrame(sentiment_data) # create a DataFrame from the sentiment data
     df.to_csv('data/sentiment_scores.csv', index=False) # save the DataFrame to a CSV file
