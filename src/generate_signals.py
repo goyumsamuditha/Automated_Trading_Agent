@@ -41,7 +41,26 @@ def main():
         try:
             df = yf.download(ticker, period='100d', progress=False)
             if df.empty:
-                results.append({'ticker': ticker, 'error': 'No data returned'})
+             rsi_val = float(latest_raw['RSI_14'].values[0])
+             macd_cross = float(latest_raw['MACD_Crossover'].values[0])
+             reasons = []
+            if rsi_val < 30:
+                reasons.append("RSI signals oversold")
+            elif rsi_val > 70:
+                reasons.append("RSI signals overbought")
+            reasons.append("MACD bullish crossover" if macd_cross == 1 else "MACD bearish crossover")
+            reasoning = "; ".join(reasons)
+            
+                results.append({
+                'ticker': ticker,
+                'date': today,
+                'signal': label,
+                'confidence': round(float(proba), 3),
+                'price': round(float(df['Close'].iloc[-1]), 2),
+                'rsi': round(float(df['RSI_14'].iloc[-1]), 1),
+                'volume': int(df['Volume'].iloc[-1]),
+                'reasoning': reasoning,
+            })
                 continue
 
             if isinstance(df.columns, pd.MultiIndex):
