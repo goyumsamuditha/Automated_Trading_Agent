@@ -79,6 +79,18 @@ def fetch_r2_json(key):
         return json.loads(obj['Body'].read().decode('utf-8'))
     except Exception:
         return None
+
+@st.cache_data(ttl=900)
+def fetch_r2_image(key):
+    """Fetch an image file from R2 and return it as raw bytes, or None if missing."""
+    try:
+        s3 = get_r2_client()
+        bucket = os.getenv('R2_BUCKET')
+        obj = s3.get_object(Bucket=bucket, Key=key)
+        return obj['Body'].read()
+    except Exception:
+        return None
+        
 @st.cache_resource
 def get_db_engine():
     return create_engine(os.getenv("SUPABASE_DB_URL"), pool_pre_ping=True, pool_recycle=3600)
