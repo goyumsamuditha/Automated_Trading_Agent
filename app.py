@@ -99,7 +99,7 @@ def fetch_portfolio_performance():
 @st.cache_data(ttl=86400) 
 def fetch_chart_data(ticker):
     """Fetches live pricing data from Yahoo Finance."""
-    chart_json = fetch_r2_json('signals/chart_history_latest.json')
+    chart_json = fetch_r2_json('charts/chart_history_latest.json')
     if not chart_json or ticker not in chart_json or not chart_json[ticker]:
         return pd.DataFrame()
     df = pd.DataFrame(chart_json[ticker])
