@@ -89,7 +89,7 @@ def main():
     chart_path = 'data/signals/chart_history_latest.json'
     with open(chart_path, 'w') as f:
         json.dump(chart_data, f)
-    upload_file_to_s3(chart_path, 'signals/chart_history_latest.json')
+    upload_file_to_s3(chart_path, 'charts/chart_history_latest.json')
     print('Chart history uploaded.')
 
 
