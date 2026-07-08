@@ -299,11 +299,14 @@ def main():
 
     with tab3:
         with st.container(border=True):
-            st.markdown("**United Airlines, flight attendants reach labor deal...**")
-            st.caption("cnbc_finance • 3/26/2026")
-            st.divider()
-            st.markdown("**Is Trump losing his grip on the stock market? Sustained declines suggest...**")
-            st.caption("marketwatch • 3/26/2026")
-
+            with st.container(border=True):
+            news_df = fetch_r2_csv('data/sentiment_scores.csv')
+            if news_df is not None and 'headline' in news_df.columns:
+                for _, row in news_df.iterrows():
+                    st.markdown(f"**{row['headline']}**")
+                    st.caption(f"{row['keyword']} • {row['date']}")
+                    st.divider()
+            else:
+                st.info("News headlines not yet synced.")
 if __name__ == "__main__":
     main()
